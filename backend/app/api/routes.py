@@ -1,9 +1,12 @@
 from fastapi.responses import FileResponse
+from datetime import datetime, timezone
+
+from app.schemas import AnalysisResponse
+from app.schemas.analysis import DetectionResponse, DetectionUpdateRequest
 
 from app.services.annotation_service import create_annotated_image
 import logging
 from pathlib import Path
-
 from fastapi import (
     APIRouter,
     Depends,
@@ -16,7 +19,6 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.model import Analysis, Detection
-from app.schemas import AnalysisResponse
 from app.services.ai_service import run_inference
 from app.services.image_service import validate_and_save_image
 
@@ -84,6 +86,7 @@ async def analyze_image(
 
         # 2. Run the actual Roboflow model.
         ai_result = run_inference(saved_path)
+        print("DEBUG - Roboflow result:", ai_result)
 
         image_info = ai_result["image"]
 
@@ -104,14 +107,18 @@ async def analyze_image(
 
         # 4. Attach all validated detections to the analysis.
         for prediction in ai_result["predictions"]:
+            
             detection = Detection(
                 class_name=prediction["class_name"],
                 confidence=prediction["confidence"],
+                original_class_name=prediction["class_name"],   #---------
+                original_confidence=prediction["confidence"],
                 x=prediction["x"],
                 y=prediction["y"],
                 width=prediction["width"],
                 height=prediction["height"],
             )
+
 
             analysis.detections.append(detection)
 
@@ -197,6 +204,8 @@ def list_analyses(
             image_height=analysis.image_height,
             latitude=analysis.latitude,
             longitude=analysis.longitude,
+            verification_status=analysis.verification_status,
+            verified_at=analysis.verified_at,
             created_at=analysis.created_at,
             prediction_count=len(analysis.detections),
             detections=[
@@ -243,6 +252,8 @@ def get_analysis(
         image_height=analysis.image_height,
         latitude=analysis.latitude,
         longitude=analysis.longitude,
+        verification_status=analysis.verification_status,
+        verified_at=analysis.verified_at,
         created_at=analysis.created_at,
         prediction_count=len(analysis.detections),
         detections=[
@@ -321,3 +332,155 @@ def get_annotated_image(
         media_type="image/jpeg",
         filename=f"analysis_{analysis.id}_annotated.jpg",
     )
+
+
+
+
+@router.post(
+    "/analyses/{analysis_id}/verify",
+    response_model=AnalysisResponse,
+)
+def verify_analysis(
+    analysis_id: int,
+    db: Session = Depends(get_db),
+):
+    """Confirm the analysis and record its verification time."""
+
+    analysis = (
+        db.query(Analysis)
+        .filter(Analysis.id == analysis_id)
+        .first()
+    )
+
+    if analysis is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis not found.",
+        )
+
+    analysis.verification_status = "verified"
+    analysis.verified_at = datetime.now(timezone.utc)
+
+    try:
+        db.commit()
+        db.refresh(analysis)
+    except Exception:
+        db.rollback()
+        logger.exception("Could not verify analysis %s", analysis_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not save analysis verification.",
+        ) from None
+
+    return get_analysis(analysis_id=analysis_id, db=db)
+
+
+@router.post(
+    "/analyses/{analysis_id}/verify",
+    response_model=AnalysisResponse,
+)
+def verify_analysis(
+    analysis_id: int,
+    db: Session = Depends(get_db),
+):
+    """Confirm the analysis and record its verification time."""
+
+    analysis = (
+        db.query(Analysis)
+        .filter(Analysis.id == analysis_id)
+        .first()
+    )
+
+    if analysis is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis not found.",
+        )
+
+    analysis.verification_status = "verified"
+    analysis.verified_at = datetime.now(timezone.utc)
+
+    try:
+        db.commit()
+        db.refresh(analysis)
+    except Exception:
+        db.rollback()
+        logger.exception("Could not verify analysis %s", analysis_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not save analysis verification.",
+        ) from None
+
+    return get_analysis(analysis_id=analysis_id, db=db)
+
+
+
+
+@router.patch(
+    "/analyses/{analysis_id}/detections/{detection_id}",
+    response_model=DetectionResponse,
+)
+def edit_detection(
+    analysis_id: int,
+    detection_id: int,
+    updates: DetectionUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    """Update a detection while preserving its original AI prediction."""
+
+    analysis = (
+        db.query(Analysis)
+        .filter(Analysis.id == analysis_id)
+        .first()
+    )
+
+    if analysis is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis not found.",
+        )
+
+    detection = (
+        db.query(Detection)
+        .filter(
+            Detection.id == detection_id,
+            Detection.analysis_id == analysis_id,
+        )
+        .first()
+    )
+
+    if detection is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Detection not found for this analysis.",
+        )
+
+    detection.class_name = updates.class_name.strip()
+    if not detection.class_name:
+        raise HTTPException(
+            status_code=422,
+            detail="Detection class name cannot be empty.",
+        )
+
+    detection.confidence = updates.confidence
+    detection.x = updates.x
+    detection.y = updates.y
+    detection.width = updates.width
+    detection.height = updates.height
+
+    try:
+        db.commit()
+        db.refresh(detection)
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Could not update detection %s in analysis %s",
+            detection_id,
+            analysis_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not save detection changes.",
+        ) from None
+
+    return detection

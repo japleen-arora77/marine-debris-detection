@@ -19,14 +19,16 @@ class Analysis(Base):
 
     image_height: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    location_name: Mapped[str | None] = mapped_column(
-        String(500), nullable=True
-    )
+    location_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True,)
 
-    longitude: Mapped[float | None] = mapped_column(Float, nullable=True,
-    )
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True,)
+
+    verification_status: Mapped[str] = mapped_column(String(20),default="pending",nullable=False,)
+
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),nullable=True,)
+    
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

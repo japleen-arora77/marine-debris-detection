@@ -1,5 +1,5 @@
 
-
+import { useEffect, useState } from "react";
 import {
   Waves,
   ScanSearch,
@@ -11,8 +11,10 @@ import {
   ExternalLink,
 } from "lucide-react";
 
+import { verifyAnalysis, updateDetection } from "../services/api";
 import "./AnalyzeSection.css";
 
+const API_BASE_URL = "http://127.0.0.1:8000";
 
 const categories = [
   { name: "Bottle", className: "bottle", icon: "♧", modelClasses: ["bottle"] },
@@ -23,34 +25,161 @@ const categories = [
   { name: "Plastic waste", className: "other", icon: "♻", modelClasses: ["plastic waste"] },
 ];
 
-
 export default function AnalyzeSection({
   analysisResult,
   originalImageUrl,
 }) {
-  console.log("Summary analysis result:", analysisResult);
-console.log("Original image URL:", originalImageUrl);
+  // Current analysis data, including any saved edits.
+  const [currentAnalysis, setCurrentAnalysis] = useState(analysisResult);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
 
-const detections = analysisResult?.detections ?? [];
+  // Update the displayed analysis whenever a new analysis is received.
+  useEffect(() => {
+    setCurrentAnalysis(analysisResult);
+    setEditingId(null);
+    setEditForm({});
+    setActionError("");
+    setActionMessage("");
+  }, [analysisResult]);
 
-const categoryCounts = detections.reduce((counts, detection) => {
-  const category = detection.class_name;
-  counts[category] = (counts[category] || 0) + 1;
-  return counts;
-}, {});
+  const detections = currentAnalysis?.detections ?? [];
+  const isVerified =
+    currentAnalysis?.verification_status === "verified";
 
-const observationDate = analysisResult?.created_at
-  ? new Date(analysisResult.created_at).toLocaleString()
-  : "Not available";
+  const observationDate = currentAnalysis?.created_at
+    ? new Date(currentAnalysis.created_at).toLocaleString()
+    : "Not available";
 
-  const annotatedImageUrl = analysisResult
-    ? `http://127.0.0.1:8000/api/analyses/${analysisResult.id}/annotated-image`
+  // Refresh the annotated image URL after an edit or verification.
+  const annotatedImageUrl = currentAnalysis
+    ? `${API_BASE_URL}/api/analyses/${currentAnalysis.id}/annotated-image?t=${encodeURIComponent(
+        detections
+          .map((detection) =>
+            `${detection.id}-${detection.class_name}-${detection.x}-${detection.y}-${detection.width}-${detection.height}`
+          )
+          .join("|")
+      )}`
     : null;
 
+  // Confirm the analysis after a human has reviewed it.
+  async function handleVerify() {
+    if (!currentAnalysis?.id || saving || isVerified) return;
+
+    setSaving(true);
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const updated = await verifyAnalysis(currentAnalysis.id);
+      setCurrentAnalysis(updated);
+      setActionMessage("Analysis confirmed and saved successfully.");
+    } catch (error) {
+      setActionError(
+        error.message || "Could not verify this analysis."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Open the editing form for one detection.
+  function startEditing(detection) {
+    if (isVerified || saving) return;
+
+    setEditingId(detection.id);
+    setEditForm({
+      class_name: detection.class_name,
+      confidence: detection.confidence,
+      x: detection.x,
+      y: detection.y,
+      width: detection.width,
+      height: detection.height,
+    });
+    setActionError("");
+    setActionMessage("");
+  }
+
+  // Save the edited detection to the backend.
+  async function handleSaveDetection(detectionId) {
+    if (!currentAnalysis?.id || saving) return;
+
+    const className = String(editForm.class_name ?? "").trim();
+    const confidence = Number(editForm.confidence);
+    const x = Number(editForm.x);
+    const y = Number(editForm.y);
+    const width = Number(editForm.width);
+    const height = Number(editForm.height);
+
+    if (
+      !className ||
+      !Number.isFinite(confidence) ||
+      confidence < 0 ||
+      confidence > 1 ||
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      !Number.isFinite(width) ||
+      width <= 0 ||
+      !Number.isFinite(height) ||
+      height <= 0
+    ) {
+      setActionError(
+        "Enter a class name, confidence between 0 and 1, and valid bounding-box values."
+      );
+      return;
+    }
+
+    setSaving(true);
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const updatedDetection = await updateDetection(
+        currentAnalysis.id,
+        detectionId,
+        {
+          class_name: className,
+          confidence,
+          x,
+          y,
+          width,
+          height,
+        }
+      );
+
+      setCurrentAnalysis((previous) => ({
+        ...previous,
+        detections: previous.detections.map((detection) =>
+          detection.id === detectionId
+            ? updatedDetection
+            : detection
+        ),
+      }));
+
+      setEditingId(null);
+      setEditForm({});
+      setActionMessage("Detection changes saved successfully.");
+    } catch (error) {
+      setActionError(
+        error.message || "Could not save detection changes."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setEditForm({});
+    setActionError("");
+    setActionMessage("");
+  }
 
   return (
     <section className="analyze-section" id="analyze-section">
-
       {/* Page Heading */}
       <header className="observation-heading">
         <div className="observation-title-group">
@@ -75,55 +204,59 @@ const observationDate = analysisResult?.created_at
 
         <span className="verification-badge">
           <Info size={17} />
-          Awaiting analysis
+          {!currentAnalysis
+            ? "Awaiting analysis"
+            : isVerified
+              ? "Verified"
+              : "Pending verification"}
         </span>
       </header>
 
       {/* Development Notice */}
       <div className="analysis-disclaimer">
         <Info size={19} />
-
         <p>
-          <strong>Development preview:</strong> AI analysis and
-          saved observations are not connected yet. No actual
-          detections or confirmed counts are available.
+          <strong>Review notice:</strong> AI predictions may need
+          human correction. Review the detections before confirming
+          an observation.
         </p>
       </div>
 
       {/* Original and Annotated Images */}
       <div className="comparison-grid">
-
         <article className="comparison-card">
           <div className="comparison-card-heading">
             <FileImage size={19} />
             <h3>Original Image</h3>
           </div>
 
-          
-<div className="comparison-placeholder">
-  {originalImageUrl ? (
-    <img
-      src={originalImageUrl}
-      alt="Original uploaded marine debris"
-      style={{
-        width: "100%",
-        height: "100%",
-        objectFit: "contain",
-      }}
-    />
-  ) : (
-    <>
-      <FileImage size={38} />
-      <strong>Original image preview</strong>
-      <p>The uploaded image will appear here after analysis.</p>
-    </>
-  )}
-</div>
-
+          <div className="comparison-placeholder">
+            {originalImageUrl ? (
+              <img
+                src={originalImageUrl}
+                alt="Original uploaded marine debris"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                }}
+              />
+            ) : (
+              <>
+                <FileImage size={38} />
+                <strong>Original image preview</strong>
+                <p>
+                  The uploaded image will appear here after analysis.
+                </p>
+              </>
+            )}
+          </div>
 
           <div className="image-caption">
             <span>Source image</span>
-            <span>Awaiting connection</span>
+            <span>
+              {originalImageUrl ? "Uploaded image" : "Awaiting image"}
+            </span>
           </div>
         </article>
 
@@ -133,39 +266,36 @@ const observationDate = analysisResult?.created_at
             <h3>AI Annotated Image</h3>
           </div>
 
-          
-<div className="comparison-placeholder annotated-placeholder">
-  {annotatedImageUrl ? (
-    <img
-      src={annotatedImageUrl}
-      alt="AI annotated marine debris image with bounding boxes"
-      key={analysisResult.id}
-      style={{
-        width: "100%",
-        height: "100%",
-        objectFit: "contain",
-      }}
-    />
-  ) : (
-    <>
-      <ScanSearch size={38} />
-
-      <strong>Annotated image preview</strong>
-
-      <p>
-        The annotated image will appear here after AI analysis.
-      </p>
-    </>
-  )}
-</div>
-
+          <div className="comparison-placeholder annotated-placeholder">
+            {annotatedImageUrl ? (
+              <img
+                src={annotatedImageUrl}
+                alt="AI annotated marine debris image with bounding boxes"
+                key={annotatedImageUrl}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                }}
+              />
+            ) : (
+              <>
+                <ScanSearch size={38} />
+                <strong>Annotated image preview</strong>
+                <p>
+                  The annotated image will appear here after AI analysis.
+                </p>
+              </>
+            )}
+          </div>
 
           <div className="image-caption">
             <span>Model output</span>
-            <span>{analysisResult ? "Annotated" : "Awaiting analysis"}</span>
+            <span>
+              {currentAnalysis ? "Annotated" : "Awaiting analysis"}
+            </span>
           </div>
         </article>
-
       </div>
 
       {/* Detection Summary */}
@@ -184,27 +314,41 @@ const observationDate = analysisResult?.created_at
         </div>
 
         <div className="detection-metrics">
-
           <article className="detection-metric">
             <span>AI detections</span>
-            <strong>{analysisResult ? detections.length : "—"}</strong>
-            <small>No data available</small>
+            <strong>
+              {currentAnalysis ? detections.length : "—"}
+            </strong>
+            <small>Predictions returned by the model</small>
           </article>
 
           <article className="detection-metric">
             <span>Human-confirmed</span>
-            <strong>—</strong>
-            <small>No review data available</small>
+            <strong>
+              {isVerified ? detections.length : "—"}
+            </strong>
+            <small>
+              {isVerified
+                ? "Detections in a verified analysis"
+                : "Confirm the analysis after reviewing"}
+            </small>
           </article>
 
           <article className="detection-metric">
             <span>Analysis status</span>
             <strong className="metric-status">
-              Awaiting analysis
+              {!currentAnalysis
+                ? "Awaiting analysis"
+                : isVerified
+                  ? "Verified"
+                  : "Pending review"}
             </strong>
-            <small>Backend not connected</small>
+            <small>
+              {isVerified
+                ? "Review has been confirmed"
+                : "Human review required"}
+            </small>
           </article>
-
         </div>
       </section>
 
@@ -218,43 +362,42 @@ const observationDate = analysisResult?.created_at
           <div>
             <h3>Debris Categories</h3>
             <p>
-              Counts will be populated from actual model and review
-              data.
+              Counts are based on the current detection labels.
             </p>
           </div>
         </div>
 
         <div className="category-grid">
-          
-{categories.map((category) => {
-  const count = detections.filter((detection) =>
-    category.modelClasses.includes(
-      detection.class_name?.trim().toLowerCase()
-    )
-  ).length;
+          {categories.map((category) => {
+            const count = detections.filter((detection) =>
+              category.modelClasses.includes(
+                detection.class_name?.trim().toLowerCase()
+              )
+            ).length;
 
-  return (
-    <article
-      className={`category-card ${category.className}`}
-      key={category.name}
-    >
-      <div className="category-icon" aria-hidden="true">
-        {category.icon}
-      </div>
+            return (
+              <article
+                className={`category-card ${category.className}`}
+                key={category.name}
+              >
+                <div className="category-icon" aria-hidden="true">
+                  {category.icon}
+                </div>
 
-      <div>
-        <span>{category.name}</span>
-        <strong>{analysisResult ? count : "—"}</strong>
-        <small>
-          {analysisResult
-            ? `${count} AI detection${count === 1 ? "" : "s"}`
-            : "No data available"}
-        </small>
-      </div>
-    </article>
-  );
-})}
-
+                <div>
+                  <span>{category.name}</span>
+                  <strong>
+                    {currentAnalysis ? count : "—"}
+                  </strong>
+                  <small>
+                    {currentAnalysis
+                      ? `${count} detection${count === 1 ? "" : "s"}`
+                      : "No data available"}
+                  </small>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </section>
 
@@ -268,57 +411,241 @@ const observationDate = analysisResult?.created_at
           <div>
             <h3>Detected Objects</h3>
             <p>
-              Individual predictions, model scores, and corrected
-              results will appear here.
+              Review model predictions and correct labels or bounding
+              boxes before confirming the observation.
             </p>
           </div>
 
-          <span className="count-pill">{analysisResult ? `${detections.length} detected` : "No data"}</span>
+          <span className="count-pill">
+            {currentAnalysis
+              ? `${detections.length} detected`
+              : "No data"}
+          </span>
         </div>
 
-        
-{!analysisResult ? (
-  <div className="detections-empty">
-    <div className="empty-state-icon">
-      <ScanSearch size={27} />
-    </div>
-    <h4>No detection results available</h4>
-    <p>
-      Run AI analysis through the backend to display detected objects.
-      This does not mean the image contains no debris.
-    </p>
-  </div>
-) : detections.length === 0 ? (
-  <div className="detections-empty">
-    <div className="empty-state-icon">
-      <ScanSearch size={27} />
-    </div>
-    <h4>No objects detected</h4>
-    <p>
-      The model returned no detections for this image.
-    </p>
-  </div>
-) : (
-  <div className="detections-list">
-    {detections.map((detection) => (
-      <article className="detection-item" key={detection.id}>
-        <div>
-          <strong>{detection.class_name}</strong>
-          <p>
-            Confidence: {(detection.confidence * 100).toFixed(1)}%
+        {actionError && (
+          <p className="verification-error" role="alert">
+            {actionError}
           </p>
-        </div>
-        <span className="count-pill">AI detected</span>
-      </article>
-    ))}
-  </div>
-)}
+        )}
 
+        {actionMessage && (
+          <p className="verification-success" role="status">
+            {actionMessage}
+          </p>
+        )}
+
+        {!currentAnalysis ? (
+          <div className="detections-empty">
+            <div className="empty-state-icon">
+              <ScanSearch size={27} />
+            </div>
+            <h4>No detection results available</h4>
+            <p>
+              Run AI analysis through the backend to display detected
+              objects. This does not mean the image contains no debris.
+            </p>
+          </div>
+        ) : detections.length === 0 ? (
+          <div className="detections-empty">
+            <div className="empty-state-icon">
+              <ScanSearch size={27} />
+            </div>
+            <h4>No objects detected</h4>
+            <p>
+              The model returned no detections for this image.
+            </p>
+          </div>
+        ) : (
+          <div className="detections-list">
+            {detections.map((detection) => (
+              <article className="detection-item" key={detection.id}>
+                {editingId === detection.id ? (
+                  <div className="detection-edit-form">
+                    <label>
+                      Class name
+                      <input
+                        type="text"
+                        value={editForm.class_name ?? ""}
+                        maxLength={100}
+                        onChange={(event) =>
+                          setEditForm((previous) => ({
+                            ...previous,
+                            class_name: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Confidence (0–1)
+                      <input
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={editForm.confidence ?? ""}
+                        onChange={(event) =>
+                          setEditForm((previous) => ({
+                            ...previous,
+                            confidence: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      X center
+                      <input
+                        type="number"
+                        step="any"
+                        value={editForm.x ?? ""}
+                        onChange={(event) =>
+                          setEditForm((previous) => ({
+                            ...previous,
+                            x: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Y center
+                      <input
+                        type="number"
+                        step="any"
+                        value={editForm.y ?? ""}
+                        onChange={(event) =>
+                          setEditForm((previous) => ({
+                            ...previous,
+                            y: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Bounding-box width
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        value={editForm.width ?? ""}
+                        onChange={(event) =>
+                          setEditForm((previous) => ({
+                            ...previous,
+                            width: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Bounding-box height
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        value={editForm.height ?? ""}
+                        onChange={(event) =>
+                          setEditForm((previous) => ({
+                            ...previous,
+                            height: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+
+                    <div className="detection-edit-actions">
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() =>
+                          handleSaveDetection(detection.id)
+                        }
+                      >
+                        {saving ? "Saving..." : "Save Changes"}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={cancelEditing}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <strong>{detection.class_name}</strong>
+                      <p>
+                        Confidence:{" "}
+                        {(detection.confidence * 100).toFixed(1)}%
+                      </p>
+                      <span className="count-pill">
+                        {isVerified ? "In verified analysis" : "AI detected"}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={saving || isVerified}
+                      onClick={() => startEditing(detection)}
+                    >
+                      Edit Detection
+                    </button>
+                  </>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
       </section>
+
+      {/* Human Verification */}
+      {currentAnalysis && (
+        <section className="summary-block verification-actions">
+          <div className="block-heading">
+            <div className="block-heading-icon">
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <h3>Human Verification</h3>
+              <p>
+                Review the AI detections above before confirming this
+                observation.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={saving || isVerified || editingId !== null}
+            onClick={handleVerify}
+          >
+            <ShieldCheck size={18} />
+            {saving
+              ? "Saving..."
+              : isVerified
+                ? "Confirmed & Saved"
+                : editingId !== null
+                  ? "Save or cancel your edit first"
+                  : "Confirm & Save"}
+          </button>
+
+          {isVerified && currentAnalysis.verified_at && (
+            <p>
+              Verified on:{" "}
+              {new Date(currentAnalysis.verified_at).toLocaleString()}
+            </p>
+          )}
+        </section>
+      )}
 
       {/* Observation Details and Location */}
       <div className="observation-details-grid">
-
         <section className="details-card">
           <div className="block-heading">
             <div className="block-heading-icon">
@@ -340,8 +667,10 @@ const observationDate = analysisResult?.created_at
           <div className="detail-row">
             <MapPin size={18} />
             <span>Location</span>
-            <strong>{analysisResult?.location_name || "Location name unavailable"}
-    </strong>
+            <strong>
+              {currentAnalysis?.location_name ||
+                "Location name unavailable"}
+            </strong>
           </div>
 
           <div className="detail-row">
@@ -353,7 +682,13 @@ const observationDate = analysisResult?.created_at
           <div className="detail-row">
             <ShieldCheck size={18} />
             <span>Verification</span>
-            <strong>Pending</strong>
+            <strong>
+              {!currentAnalysis
+                ? "Awaiting analysis"
+                : isVerified
+                  ? "Verified"
+                  : "Pending"}
+            </strong>
           </div>
         </section>
 
@@ -371,12 +706,17 @@ const observationDate = analysisResult?.created_at
 
           <div className="map-placeholder">
             <MapPin size={32} />
-
-            <strong>No coordinates available</strong>
-
+            <strong>
+              {currentAnalysis?.latitude != null &&
+              currentAnalysis?.longitude != null
+                ? `${currentAnalysis.latitude}, ${currentAnalysis.longitude}`
+                : "No coordinates available"}
+            </strong>
             <p>
-              A map marker will appear after valid observation
-              coordinates are supplied.
+              {currentAnalysis?.latitude != null &&
+              currentAnalysis?.longitude != null
+                ? "Coordinates saved with this observation."
+                : "A map marker will appear after valid observation coordinates are supplied."}
             </p>
           </div>
 
@@ -391,7 +731,6 @@ const observationDate = analysisResult?.created_at
             <ExternalLink size={15} />
           </button>
         </section>
-
       </div>
 
       {/* Footer */}
@@ -399,7 +738,6 @@ const observationDate = analysisResult?.created_at
         Aqua Scan · Environmental monitoring prototype ·
         Inspection priority is not a scientific pollution measurement.
       </footer>
-
     </section>
   );
 }
