@@ -43,6 +43,11 @@ const observationDate = analysisResult?.created_at
   ? new Date(analysisResult.created_at).toLocaleString()
   : "Not available";
 
+  const annotatedImageUrl = analysisResult
+    ? `http://127.0.0.1:8000/api/analyses/${analysisResult.id}/annotated-image`
+    : null;
+
+
   return (
     <section className="analyze-section" id="analyze-section">
 
@@ -128,20 +133,36 @@ const observationDate = analysisResult?.created_at
             <h3>AI Annotated Image</h3>
           </div>
 
-          <div className="comparison-placeholder annotated-placeholder">
-            <ScanSearch size={38} />
+          
+<div className="comparison-placeholder annotated-placeholder">
+  {annotatedImageUrl ? (
+    <img
+      src={annotatedImageUrl}
+      alt="AI annotated marine debris image with bounding boxes"
+      key={analysisResult.id}
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+      }}
+    />
+  ) : (
+    <>
+      <ScanSearch size={38} />
 
-            <strong>Annotated image preview</strong>
+      <strong>Annotated image preview</strong>
 
-            <p>
-              The backend-provided annotated image will appear here
-              when available.
-            </p>
-          </div>
+      <p>
+        The annotated image will appear here after AI analysis.
+      </p>
+    </>
+  )}
+</div>
+
 
           <div className="image-caption">
             <span>Model output</span>
-            <span>Not generated</span>
+            <span>{analysisResult ? "Annotated" : "Awaiting analysis"}</span>
           </div>
         </article>
 
@@ -319,10 +340,7 @@ const observationDate = analysisResult?.created_at
           <div className="detail-row">
             <MapPin size={18} />
             <span>Location</span>
-            <strong>{analysisResult?.latitude != null &&
-  analysisResult?.longitude != null
-    ? `${analysisResult.latitude}, ${analysisResult.longitude}`
-    : "Location unknown"}
+            <strong>{analysisResult?.location_name || "Location name unavailable"}
     </strong>
           </div>
 

@@ -1,4 +1,6 @@
+from fastapi.responses import FileResponse
 
+from app.services.annotation_service import create_annotated_image
 import logging
 from pathlib import Path
 
@@ -48,6 +50,7 @@ async def analyze_image(
     file: UploadFile = File(...),
     latitude: float | None = Form(default=None),
     longitude: float | None = Form(default=None),
+    location_name: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     if (latitude is None) != (longitude is None):
@@ -95,6 +98,7 @@ async def analyze_image(
             image_height=int(image_height),
             latitude=latitude,
             longitude=longitude,
+            location_name=location_name,
         )
         
 
@@ -124,6 +128,7 @@ async def analyze_image(
             image_height=analysis.image_height,
             latitude=analysis.latitude,
             longitude=analysis.longitude,
+            location_name=location_name,
             created_at=analysis.created_at,
             prediction_count=len(analysis.detections),
             detections=[
@@ -252,4 +257,67 @@ def get_analysis(
             }
             for detection in analysis.detections
         ],
+    )
+
+
+
+@router.get("/analyses/{analysis_id}/annotated-image")
+def get_annotated_image(
+    analysis_id: int,
+    db: Session = Depends(get_db),
+):
+    analysis = db.query(Analysis).filter(
+        Analysis.id == analysis_id
+    ).first()
+
+    if analysis is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis not found.",
+        )
+
+    original_path = UPLOAD_DIR / analysis.filename
+
+    if not original_path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="Original image file not found.",
+        )
+
+    detections = [
+        {
+            "class_name": detection.class_name,
+            "confidence": detection.confidence,
+            "x": detection.x,
+            "y": detection.y,
+            "width": detection.width,
+            "height": detection.height,
+        }
+        for detection in analysis.detections
+    ]
+
+    output_path = (
+        UPLOAD_DIR / "annotated" / f"analysis_{analysis.id}.jpg"
+    )
+
+    try:
+        create_annotated_image(
+            original_path=original_path,
+            detections=detections,
+            output_path=output_path,
+        )
+    except Exception:
+        logger.exception(
+            "Could not generate annotated image for analysis %s",
+            analysis_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not generate annotated image.",
+        ) from None
+
+    return FileResponse(
+        path=output_path,
+        media_type="image/jpeg",
+        filename=f"analysis_{analysis.id}_annotated.jpg",
     )

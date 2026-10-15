@@ -1,10 +1,9 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import DateTime, Float, Integer, String
 from app.database import Base
+from sqlalchemy import Column, Integer, String, Float, DateTime
 
 
 class Analysis(Base):
@@ -19,6 +18,10 @@ class Analysis(Base):
     image_width: Mapped[int] = mapped_column(Integer, nullable=False)
 
     image_height: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    location_name: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )
 
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True,)
 
