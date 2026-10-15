@@ -13,30 +13,36 @@ import {
 
 import "./AnalyzeSection.css";
 
+
 const categories = [
-  {
-    name: "Plastic",
-    icon: "♧",
-    className: "plastic",
-  },
-  {
-    name: "Metal",
-    icon: "▤",
-    className: "metal",
-  },
-  {
-    name: "Fishing net",
-    icon: "⌘",
-    className: "fishing",
-  },
-  {
-    name: "Other debris",
-    icon: "◇",
-    className: "other",
-  },
+  { name: "Bottle", className: "bottle", icon: "♧", modelClasses: ["bottle"] },
+  { name: "Plastic bag", className: "plastic", icon: "◇", modelClasses: ["plastic bag"] },
+  { name: "Tire", className: "tire", icon: "◉", modelClasses: ["tire"] },
+  { name: "Aluminum can", className: "metal", icon: "▤", modelClasses: ["aluminum can"] },
+  { name: "Fishing net", className: "fishing", icon: "⌘", modelClasses: ["fishing net"] },
+  { name: "Plastic waste", className: "other", icon: "♻", modelClasses: ["plastic waste"] },
 ];
 
-export default function AnalyzeSection() {
+
+export default function AnalyzeSection({
+  analysisResult,
+  originalImageUrl,
+}) {
+  console.log("Summary analysis result:", analysisResult);
+console.log("Original image URL:", originalImageUrl);
+
+const detections = analysisResult?.detections ?? [];
+
+const categoryCounts = detections.reduce((counts, detection) => {
+  const category = detection.class_name;
+  counts[category] = (counts[category] || 0) + 1;
+  return counts;
+}, {});
+
+const observationDate = analysisResult?.created_at
+  ? new Date(analysisResult.created_at).toLocaleString()
+  : "Not available";
+
   return (
     <section className="analyze-section" id="analyze-section">
 
@@ -88,15 +94,27 @@ export default function AnalyzeSection() {
             <h3>Original Image</h3>
           </div>
 
-          <div className="comparison-placeholder">
-            <FileImage size={38} />
+          
+<div className="comparison-placeholder">
+  {originalImageUrl ? (
+    <img
+      src={originalImageUrl}
+      alt="Original uploaded marine debris"
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+      }}
+    />
+  ) : (
+    <>
+      <FileImage size={38} />
+      <strong>Original image preview</strong>
+      <p>The uploaded image will appear here after analysis.</p>
+    </>
+  )}
+</div>
 
-            <strong>Original image preview</strong>
-
-            <p>
-              The image selected on the upload page will appear here.
-            </p>
-          </div>
 
           <div className="image-caption">
             <span>Source image</span>
@@ -148,7 +166,7 @@ export default function AnalyzeSection() {
 
           <article className="detection-metric">
             <span>AI detections</span>
-            <strong>—</strong>
+            <strong>{analysisResult ? detections.length : "—"}</strong>
             <small>No data available</small>
           </article>
 
@@ -186,22 +204,36 @@ export default function AnalyzeSection() {
         </div>
 
         <div className="category-grid">
-          {categories.map((category) => (
-            <article
-              className={`category-card ${category.className}`}
-              key={category.name}
-            >
-              <div className="category-icon" aria-hidden="true">
-                {category.icon}
-              </div>
+          
+{categories.map((category) => {
+  const count = detections.filter((detection) =>
+    category.modelClasses.includes(
+      detection.class_name?.trim().toLowerCase()
+    )
+  ).length;
 
-              <div>
-                <span>{category.name}</span>
-                <strong>—</strong>
-                <small>No data available</small>
-              </div>
-            </article>
-          ))}
+  return (
+    <article
+      className={`category-card ${category.className}`}
+      key={category.name}
+    >
+      <div className="category-icon" aria-hidden="true">
+        {category.icon}
+      </div>
+
+      <div>
+        <span>{category.name}</span>
+        <strong>{analysisResult ? count : "—"}</strong>
+        <small>
+          {analysisResult
+            ? `${count} AI detection${count === 1 ? "" : "s"}`
+            : "No data available"}
+        </small>
+      </div>
+    </article>
+  );
+})}
+
         </div>
       </section>
 
@@ -220,21 +252,47 @@ export default function AnalyzeSection() {
             </p>
           </div>
 
-          <span className="count-pill">No data</span>
+          <span className="count-pill">{analysisResult ? `${detections.length} detected` : "No data"}</span>
         </div>
 
-        <div className="detections-empty">
-          <div className="empty-state-icon">
-            <ScanSearch size={27} />
-          </div>
-
-          <h4>No detection results available</h4>
-
+        
+{!analysisResult ? (
+  <div className="detections-empty">
+    <div className="empty-state-icon">
+      <ScanSearch size={27} />
+    </div>
+    <h4>No detection results available</h4>
+    <p>
+      Run AI analysis through the backend to display detected objects.
+      This does not mean the image contains no debris.
+    </p>
+  </div>
+) : detections.length === 0 ? (
+  <div className="detections-empty">
+    <div className="empty-state-icon">
+      <ScanSearch size={27} />
+    </div>
+    <h4>No objects detected</h4>
+    <p>
+      The model returned no detections for this image.
+    </p>
+  </div>
+) : (
+  <div className="detections-list">
+    {detections.map((detection) => (
+      <article className="detection-item" key={detection.id}>
+        <div>
+          <strong>{detection.class_name}</strong>
           <p>
-            Run AI analysis through the backend to display detected
-            objects. This does not mean the image contains no debris.
+            Confidence: {(detection.confidence * 100).toFixed(1)}%
           </p>
         </div>
+        <span className="count-pill">AI detected</span>
+      </article>
+    ))}
+  </div>
+)}
+
       </section>
 
       {/* Observation Details and Location */}
@@ -255,25 +313,29 @@ export default function AnalyzeSection() {
           <div className="detail-row">
             <CalendarDays size={18} />
             <span>Observation date</span>
-            <strong>Not available</strong>
+            <strong>{observationDate}</strong>
           </div>
 
           <div className="detail-row">
             <MapPin size={18} />
             <span>Location</span>
-            <strong>Location unknown</strong>
+            <strong>{analysisResult?.latitude != null &&
+  analysisResult?.longitude != null
+    ? `${analysisResult.latitude}, ${analysisResult.longitude}`
+    : "Location unknown"}
+    </strong>
           </div>
 
           <div className="detail-row">
             <ScanSearch size={18} />
             <span>Location source</span>
-            <strong>Not available</strong>
+            <strong>By user</strong>
           </div>
 
           <div className="detail-row">
             <ShieldCheck size={18} />
             <span>Verification</span>
-            <strong>Not reviewed</strong>
+            <strong>Pending</strong>
           </div>
         </section>
 

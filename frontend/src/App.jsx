@@ -1,12 +1,25 @@
 
+import { useState } from "react";
 import UploadPage from "./pages/UploadPage";
 import AnalyzeSection from "./pages/AnalyzeSection";
 
 function App() {
-   return (
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [originalImageUrl, setOriginalImageUrl] = useState("");
+
+  return (
     <>
-      <UploadPage />
-      <AnalyzeSection />
+      <UploadPage
+        onAnalysisComplete={(result, imageUrl) => {
+          setAnalysisResult(result);
+          setOriginalImageUrl(imageUrl);
+        }}
+      />
+
+      <AnalyzeSection
+        analysisResult={analysisResult}
+        originalImageUrl={originalImageUrl}
+      />
     </>
   );
 }

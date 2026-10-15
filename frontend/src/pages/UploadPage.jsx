@@ -43,7 +43,7 @@ function MapClickHandler({ onSelect }) {
   return null;
 }
 
-export default function UploadPage() {
+export default function UploadPage({ onAnalysisComplete }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
@@ -201,6 +201,7 @@ async function handleAnalyze() {
 
   try {
     const result = await analyzeImage(file, selectedLocation);
+    onAnalysisComplete?.(result, preview);
 
     setAnalysisResult(result);
     setPageError("Image analysis completed successfully.");
