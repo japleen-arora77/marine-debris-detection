@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets
+.env
+
+# Local database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded images and generated files
+uploads/*
+!uploads/.gitkeep
+
+# Test and tooling caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor and operating system files
+.vscode/
+.DS_Store
+Thumbs.db
