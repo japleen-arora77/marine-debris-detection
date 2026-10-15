@@ -1,165 +1,325 @@
 
-import { useState } from "react";
+
 import {
   Waves,
   ScanSearch,
-  Image as ImageIcon,
   MapPin,
+  CalendarDays,
   ShieldCheck,
-  Pencil,
-  CheckCircle2,
   Info,
+  FileImage,
+  ExternalLink,
 } from "lucide-react";
+
 import "./AnalyzeSection.css";
 
-export default function AnalyzeSection() {
-  const [reviewStatus, setReviewStatus] = useState("Pending");
+const categories = [
+  {
+    name: "Plastic",
+    icon: "♧",
+    className: "plastic",
+  },
+  {
+    name: "Metal",
+    icon: "▤",
+    className: "metal",
+  },
+  {
+    name: "Fishing net",
+    icon: "⌘",
+    className: "fishing",
+  },
+  {
+    name: "Other debris",
+    icon: "◇",
+    className: "other",
+  },
+];
 
+export default function AnalyzeSection() {
   return (
     <section className="analyze-section" id="analyze-section">
-      <header className="analyze-header">
-        <div className="analyze-brand">
-          <span className="analyze-brand-icon">
-            <Waves size={23} />
-          </span>
+
+      {/* Page Heading */}
+      <header className="observation-heading">
+        <div className="observation-title-group">
+          <div className="observation-title-icon">
+            <FileImage size={25} />
+          </div>
 
           <div>
-            <p className="analyze-kicker">AQUA SCAN</p>
-            <h2>Marine Debris Analysis</h2>
-            <p className="analyze-subtitle">
-              Review image analysis and observation details.
+            <div className="observation-breadcrumb">
+              Aqua Scan <span>/</span> Detection{" "}
+              <span>/</span> Observation Summary
+            </div>
+
+            <h2>Observation Summary</h2>
+
+            <p>
+              Review the original image, AI predictions, and
+              observation details.
             </p>
           </div>
         </div>
 
-        <span className="analyze-status">
-          <span className="analyze-status-dot" />
-          {reviewStatus === "Pending"
-            ? "Awaiting analysis"
-            : reviewStatus}
+        <span className="verification-badge">
+          <Info size={17} />
+          Awaiting analysis
         </span>
       </header>
 
-      <div className="analyze-notice">
+      {/* Development Notice */}
+      <div className="analysis-disclaimer">
         <Info size={19} />
+
         <p>
-          <strong>Development preview:</strong> AI analysis is not
-          connected yet. No actual detections are being displayed.
+          <strong>Development preview:</strong> AI analysis and
+          saved observations are not connected yet. No actual
+          detections or confirmed counts are available.
         </p>
       </div>
 
-      <div className="analyze-image-area">
-        <div className="analyze-image-heading">
-          <div>
-            <h3>Analyzed Image</h3>
-            <p>Your annotated image will appear here.</p>
+      {/* Original and Annotated Images */}
+      <div className="comparison-grid">
+
+        <article className="comparison-card">
+          <div className="comparison-card-heading">
+            <FileImage size={19} />
+            <h3>Original Image</h3>
           </div>
 
-          <span className="image-type-label">
-            <ImageIcon size={15} />
-            Image preview
-          </span>
-        </div>
+          <div className="comparison-placeholder">
+            <FileImage size={38} />
 
-        <div className="analyze-image-placeholder">
-          <div className="placeholder-icon">
+            <strong>Original image preview</strong>
+
+            <p>
+              The image selected on the upload page will appear here.
+            </p>
+          </div>
+
+          <div className="image-caption">
+            <span>Source image</span>
+            <span>Awaiting connection</span>
+          </div>
+        </article>
+
+        <article className="comparison-card">
+          <div className="comparison-card-heading">
+            <ScanSearch size={19} />
+            <h3>AI Annotated Image</h3>
+          </div>
+
+          <div className="comparison-placeholder annotated-placeholder">
             <ScanSearch size={38} />
+
+            <strong>Annotated image preview</strong>
+
+            <p>
+              The backend-provided annotated image will appear here
+              when available.
+            </p>
           </div>
 
-          <h3>Ready for AI analysis</h3>
+          <div className="image-caption">
+            <span>Model output</span>
+            <span>Not generated</span>
+          </div>
+        </article>
 
-          <p>
-            Connect the backend to display the uploaded image,
-            detected objects, and real bounding boxes here.
-          </p>
+      </div>
+
+      {/* Detection Summary */}
+      <section className="summary-block">
+        <div className="block-heading">
+          <div className="block-heading-icon">
+            <ScanSearch size={20} />
+          </div>
+
+          <div>
+            <h3>Detection Summary</h3>
+            <p>
+              AI predictions and human verification are separate.
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="analyze-metrics">
-        <article className="analyze-metric-card">
-          <span>AI detections</span>
-          <strong>Not available</strong>
-          <small>Waiting for backend</small>
-        </article>
+        <div className="detection-metrics">
 
-        <article className="analyze-metric-card">
-          <span>Categories</span>
-          <strong>Not available</strong>
-          <small>Waiting for backend</small>
-        </article>
+          <article className="detection-metric">
+            <span>AI detections</span>
+            <strong>—</strong>
+            <small>No data available</small>
+          </article>
 
-        <article className="analyze-metric-card">
-          <span>Review status</span>
-          <strong>{reviewStatus}</strong>
-          <small>Human verification</small>
-        </article>
-      </div>
+          <article className="detection-metric">
+            <span>Human-confirmed</span>
+            <strong>—</strong>
+            <small>No review data available</small>
+          </article>
 
-      <div className="detected-objects-panel">
-        <div className="detected-panel-heading">
+          <article className="detection-metric">
+            <span>Analysis status</span>
+            <strong className="metric-status">
+              Awaiting analysis
+            </strong>
+            <small>Backend not connected</small>
+          </article>
+
+        </div>
+      </section>
+
+      {/* Debris Categories */}
+      <section className="summary-block">
+        <div className="block-heading">
+          <div className="block-heading-icon">
+            <Waves size={20} />
+          </div>
+
+          <div>
+            <h3>Debris Categories</h3>
+            <p>
+              Counts will be populated from actual model and review
+              data.
+            </p>
+          </div>
+        </div>
+
+        <div className="category-grid">
+          {categories.map((category) => (
+            <article
+              className={`category-card ${category.className}`}
+              key={category.name}
+            >
+              <div className="category-icon" aria-hidden="true">
+                {category.icon}
+              </div>
+
+              <div>
+                <span>{category.name}</span>
+                <strong>—</strong>
+                <small>No data available</small>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* Detected Objects */}
+      <section className="summary-block">
+        <div className="block-heading detected-heading">
+          <div className="block-heading-icon">
+            <ScanSearch size={20} />
+          </div>
+
           <div>
             <h3>Detected Objects</h3>
-            <p>AI predictions will be listed here after analysis.</p>
+            <p>
+              Individual predictions, model scores, and corrected
+              results will appear here.
+            </p>
           </div>
 
-          <span className="object-count">0 objects</span>
+          <span className="count-pill">No data</span>
         </div>
 
-        <div className="no-detections">
-          <ScanSearch size={27} />
-          <strong>No results available</strong>
+        <div className="detections-empty">
+          <div className="empty-state-icon">
+            <ScanSearch size={27} />
+          </div>
+
+          <h4>No detection results available</h4>
+
           <p>
-            Analysis has not run yet. This does not mean that the
-            image contains no marine debris.
+            Run AI analysis through the backend to display detected
+            objects. This does not mean the image contains no debris.
           </p>
         </div>
-      </div>
+      </section>
 
-      <div className="analyze-location-card">
-        <div className="location-card-icon">
-          <MapPin size={21} />
-        </div>
+      {/* Observation Details and Location */}
+      <div className="observation-details-grid">
 
-        <div>
-          <h3>Observation Location</h3>
-          <p>Location will be shared from the upload section later.</p>
-          <span>Location not connected</span>
-        </div>
-      </div>
+        <section className="details-card">
+          <div className="block-heading">
+            <div className="block-heading-icon">
+              <FileImage size={20} />
+            </div>
 
-      <div className="analyze-review-actions">
-        <div className="review-help">
-          <ShieldCheck size={20} />
-          <span>Human verification is separate from AI prediction.</span>
-        </div>
+            <div>
+              <h3>Observation Details</h3>
+              <p>Information about this observation.</p>
+            </div>
+          </div>
 
-        <div className="review-buttons">
+          <div className="detail-row">
+            <CalendarDays size={18} />
+            <span>Observation date</span>
+            <strong>Not available</strong>
+          </div>
+
+          <div className="detail-row">
+            <MapPin size={18} />
+            <span>Location</span>
+            <strong>Location unknown</strong>
+          </div>
+
+          <div className="detail-row">
+            <ScanSearch size={18} />
+            <span>Location source</span>
+            <strong>Not available</strong>
+          </div>
+
+          <div className="detail-row">
+            <ShieldCheck size={18} />
+            <span>Verification</span>
+            <strong>Not reviewed</strong>
+          </div>
+        </section>
+
+        <section className="details-card">
+          <div className="block-heading">
+            <div className="block-heading-icon">
+              <MapPin size={20} />
+            </div>
+
+            <div>
+              <h3>Observation Location</h3>
+              <p>Map preview for a known observation site.</p>
+            </div>
+          </div>
+
+          <div className="map-placeholder">
+            <MapPin size={32} />
+
+            <strong>No coordinates available</strong>
+
+            <p>
+              A map marker will appear after valid observation
+              coordinates are supplied.
+            </p>
+          </div>
+
           <button
             type="button"
-            className="review-button secondary"
-            onClick={() => setReviewStatus("Pending")}
+            className="map-link-button"
+            disabled
+            title="Available after map integration"
           >
-            <Pencil size={17} />
-            Reset review
+            <MapPin size={17} />
+            View on Pollution Map
+            <ExternalLink size={15} />
           </button>
+        </section>
 
-          <button
-            type="button"
-            className="review-button primary"
-            onClick={() =>
-              setReviewStatus("Ready for review")
-            }
-          >
-            <CheckCircle2 size={17} />
-            Prepare review
-          </button>
-        </div>
       </div>
 
-      <p className="analyze-footer-note">
-        Aqua Scan is an environmental monitoring prototype.
-        Detection results require backend analysis and human review.
-      </p>
+      {/* Footer */}
+      <footer className="analysis-footer">
+        Aqua Scan · Environmental monitoring prototype ·
+        Inspection priority is not a scientific pollution measurement.
+      </footer>
+
     </section>
   );
 }
