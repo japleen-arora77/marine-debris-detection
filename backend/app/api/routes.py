@@ -1,25 +1,27 @@
-from fastapi.responses import FileResponse
-from datetime import datetime, timezone
 
-from app.schemas import AnalysisResponse
-from app.schemas.analysis import DetectionResponse, DetectionUpdateRequest
-
-from app.services.annotation_service import create_annotated_image
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
+
 from fastapi import (
     APIRouter,
     Depends,
     File,
     Form,
     HTTPException,
+    Query,
     UploadFile,
-) 
+)
+from fastapi.responses import FileResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.model import Analysis, Detection
+from app.schemas import AnalysisResponse
+from app.schemas.analysis import DetectionResponse, DetectionUpdateRequest
 from app.services.ai_service import run_inference
+from app.services.annotation_service import create_annotated_image
 from app.services.image_service import validate_and_save_image
 
 
@@ -28,6 +30,37 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Images"])
 
 UPLOAD_DIR = Path("uploads")
+
+
+def build_analysis_response(analysis: Analysis) -> AnalysisResponse:
+    """Build a consistent response for a saved analysis."""
+
+    return AnalysisResponse(
+        id=analysis.id,
+        filename=analysis.filename,
+        model_id=analysis.model_id,
+        image_width=analysis.image_width,
+        image_height=analysis.image_height,
+        latitude=analysis.latitude,
+        longitude=analysis.longitude,
+        location_name=analysis.location_name,
+        verification_status=analysis.verification_status,
+        verified_at=analysis.verified_at,
+        created_at=analysis.created_at,
+        prediction_count=len(analysis.detections),
+        detections=[
+            {
+                "id": detection.id,
+                "class_name": detection.class_name,
+                "confidence": detection.confidence,
+                "x": detection.x,
+                "y": detection.y,
+                "width": detection.width,
+                "height": detection.height,
+            }
+            for detection in analysis.detections
+        ],
+    )
 
 
 @router.post("/images/validate-upload")
@@ -52,31 +85,30 @@ async def analyze_image(
     file: UploadFile = File(...),
     latitude: float | None = Form(default=None),
     longitude: float | None = Form(default=None),
-    location_name: str | None = Form(None),
+    location_name: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ):
     if (latitude is None) != (longitude is None):
-            raise HTTPException(
+        raise HTTPException(
             status_code=422,
             detail="Provide both latitude and longitude, or neither.",
-            )
+        )
 
     if latitude is not None and not -90 <= latitude <= 90:
-            raise HTTPException(
+        raise HTTPException(
             status_code=422,
             detail="Latitude must be between -90 and 90.",
-            )
+        )
 
     if longitude is not None and not -180 <= longitude <= 180:
-            raise HTTPException(
+        raise HTTPException(
             status_code=422,
             detail="Longitude must be between -180 and 180.",
-            )
+        )
 
     saved_path = None
 
     try:
-        # 1. Validate and save the uploaded image.
         image_result = await validate_and_save_image(
             file=file,
             upload_dir=UPLOAD_DIR,
@@ -84,7 +116,6 @@ async def analyze_image(
 
         saved_path = Path(image_result["path"])
 
-        # 2. Run the actual Roboflow model.
         ai_result = run_inference(saved_path)
         print("DEBUG - Roboflow result:", ai_result)
 
@@ -93,7 +124,6 @@ async def analyze_image(
         image_width = image_info.get("width") or image_result["width"]
         image_height = image_info.get("height") or image_result["height"]
 
-        # 3. Create the parent analysis record.
         analysis = Analysis(
             filename=image_result["filename"],
             model_id=ai_result["model_id"],
@@ -103,15 +133,12 @@ async def analyze_image(
             longitude=longitude,
             location_name=location_name,
         )
-        
 
-        # 4. Attach all validated detections to the analysis.
         for prediction in ai_result["predictions"]:
-            
             detection = Detection(
                 class_name=prediction["class_name"],
                 confidence=prediction["confidence"],
-                original_class_name=prediction["class_name"],   #---------
+                original_class_name=prediction["class_name"],
                 original_confidence=prediction["confidence"],
                 x=prediction["x"],
                 y=prediction["y"],
@@ -119,40 +146,13 @@ async def analyze_image(
                 height=prediction["height"],
             )
 
-
             analysis.detections.append(detection)
 
         db.add(analysis)
         db.commit()
         db.refresh(analysis)
 
-        # 5. Build the response after the database commit.
-        response = AnalysisResponse(
-            id=analysis.id,
-            filename=analysis.filename,
-            model_id=analysis.model_id,
-            image_width=analysis.image_width,
-            image_height=analysis.image_height,
-            latitude=analysis.latitude,
-            longitude=analysis.longitude,
-            location_name=location_name,
-            created_at=analysis.created_at,
-            prediction_count=len(analysis.detections),
-            detections=[
-                {
-                    "id": detection.id,
-                    "class_name": detection.class_name,
-                    "confidence": detection.confidence,
-                    "x": detection.x,
-                    "y": detection.y,
-                    "width": detection.width,
-                    "height": detection.height,
-                }
-                for detection in analysis.detections
-            ],
-        )
-
-        return response
+        return build_analysis_response(analysis)
 
     except HTTPException:
         db.rollback()
@@ -182,48 +182,60 @@ async def analyze_image(
         ) from None
 
 
+# --------------------------------------------------
+# ANALYSIS HISTORY: PAGINATION AND FILTERING
+# --------------------------------------------------
 
-@router.get("/analyses", response_model=list[AnalysisResponse])
+@router.get("/analyses")
 def list_analyses(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    verification_status: str | None = Query(
+        default=None,
+        pattern="^(pending|verified)$",
+    ),
     db: Session = Depends(get_db),
 ):
-    """Return saved analyses, newest first."""
+    """
+    Return paginated analysis history, newest first.
+
+    Optional parameters:
+    - limit: number of records to return (1-100)
+    - offset: number of records to skip
+    - verification_status: pending or verified
+    """
+
+    query = db.query(Analysis)
+
+    if verification_status is not None:
+        query = query.filter(
+            Analysis.verification_status == verification_status
+        )
+
+    total = query.with_entities(func.count(Analysis.id)).scalar() or 0
 
     analyses = (
-        db.query(Analysis)
+        query
         .order_by(Analysis.created_at.desc(), Analysis.id.desc())
+        .offset(offset)
+        .limit(limit)
         .all()
     )
 
-    return [
-        AnalysisResponse(
-            id=analysis.id,
-            filename=analysis.filename,
-            model_id=analysis.model_id,
-            image_width=analysis.image_width,
-            image_height=analysis.image_height,
-            latitude=analysis.latitude,
-            longitude=analysis.longitude,
-            verification_status=analysis.verification_status,
-            verified_at=analysis.verified_at,
-            created_at=analysis.created_at,
-            prediction_count=len(analysis.detections),
-            detections=[
-                {
-                    "id": detection.id,
-                    "class_name": detection.class_name,
-                    "confidence": detection.confidence,
-                    "x": detection.x,
-                    "y": detection.y,
-                    "width": detection.width,
-                    "height": detection.height,
-                }
-                for detection in analysis.detections
-            ],
-        )
-        for analysis in analyses
-    ]
+    return {
+        "items": [
+            build_analysis_response(analysis)
+            for analysis in analyses
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
+
+# --------------------------------------------------
+# GET ONE ANALYSIS
+# --------------------------------------------------
 
 @router.get("/analyses/{analysis_id}", response_model=AnalysisResponse)
 def get_analysis(
@@ -244,42 +256,103 @@ def get_analysis(
             detail="Analysis not found.",
         )
 
-    return AnalysisResponse(
-        id=analysis.id,
+    return build_analysis_response(analysis)
+
+
+# --------------------------------------------------
+# DELETE AN ANALYSIS AND ITS DETECTIONS
+# --------------------------------------------------
+
+@router.delete("/analyses/{analysis_id}")
+def delete_analysis(
+    analysis_id: int,
+    db: Session = Depends(get_db),
+):
+    """Delete an analysis and its associated detection records."""
+
+    analysis = (
+        db.query(Analysis)
+        .filter(Analysis.id == analysis_id)
+        .first()
+    )
+
+    if analysis is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis not found.",
+        )
+
+    try:
+        db.delete(analysis)
+        db.commit()
+
+    except Exception:
+        db.rollback()
+        logger.exception("Could not delete analysis %s", analysis_id)
+
+        raise HTTPException(
+            status_code=500,
+            detail="Could not delete the analysis.",
+        ) from None
+
+    return {
+        "message": "Analysis and associated detections deleted successfully.",
+        "analysis_id": analysis_id,
+    }
+
+
+
+# --------------------------------------------------
+# GET ORIGINAL UPLOADED IMAGE
+# --------------------------------------------------
+
+@router.get("/analyses/{analysis_id}/image")
+def get_original_image(
+    analysis_id: int,
+    db: Session = Depends(get_db),
+):
+    """Return the original image associated with an analysis."""
+
+    analysis = (
+        db.query(Analysis)
+        .filter(Analysis.id == analysis_id)
+        .first()
+    )
+
+    if analysis is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Analysis not found.",
+        )
+
+    original_path = UPLOAD_DIR / analysis.filename
+
+    if not original_path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="Original image file not found.",
+        )
+
+    return FileResponse(
+        path=original_path,
         filename=analysis.filename,
-        model_id=analysis.model_id,
-        image_width=analysis.image_width,
-        image_height=analysis.image_height,
-        latitude=analysis.latitude,
-        longitude=analysis.longitude,
-        verification_status=analysis.verification_status,
-        verified_at=analysis.verified_at,
-        created_at=analysis.created_at,
-        prediction_count=len(analysis.detections),
-        detections=[
-            {
-                "id": detection.id,
-                "class_name": detection.class_name,
-                "confidence": detection.confidence,
-                "x": detection.x,
-                "y": detection.y,
-                "width": detection.width,
-                "height": detection.height,
-            }
-            for detection in analysis.detections
-        ],
     )
 
 
+# --------------------------------------------------
+# GENERATE ANNOTATED IMAGE
+# --------------------------------------------------
 
 @router.get("/analyses/{analysis_id}/annotated-image")
 def get_annotated_image(
     analysis_id: int,
     db: Session = Depends(get_db),
 ):
-    analysis = db.query(Analysis).filter(
-        Analysis.id == analysis_id
-    ).first()
+    analysis = (
+        db.query(Analysis)
+        .filter(Analysis.id == analysis_id)
+        .first()
+    )
 
     if analysis is None:
         raise HTTPException(
@@ -317,11 +390,13 @@ def get_annotated_image(
             detections=detections,
             output_path=output_path,
         )
+
     except Exception:
         logger.exception(
             "Could not generate annotated image for analysis %s",
             analysis_id,
         )
+
         raise HTTPException(
             status_code=500,
             detail="Could not generate annotated image.",
@@ -334,46 +409,9 @@ def get_annotated_image(
     )
 
 
-
-
-@router.post(
-    "/analyses/{analysis_id}/verify",
-    response_model=AnalysisResponse,
-)
-def verify_analysis(
-    analysis_id: int,
-    db: Session = Depends(get_db),
-):
-    """Confirm the analysis and record its verification time."""
-
-    analysis = (
-        db.query(Analysis)
-        .filter(Analysis.id == analysis_id)
-        .first()
-    )
-
-    if analysis is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Analysis not found.",
-        )
-
-    analysis.verification_status = "verified"
-    analysis.verified_at = datetime.now(timezone.utc)
-
-    try:
-        db.commit()
-        db.refresh(analysis)
-    except Exception:
-        db.rollback()
-        logger.exception("Could not verify analysis %s", analysis_id)
-        raise HTTPException(
-            status_code=500,
-            detail="Could not save analysis verification.",
-        ) from None
-
-    return get_analysis(analysis_id=analysis_id, db=db)
-
+# --------------------------------------------------
+# HUMAN VERIFICATION
+# --------------------------------------------------
 
 @router.post(
     "/analyses/{analysis_id}/verify",
@@ -403,18 +441,22 @@ def verify_analysis(
     try:
         db.commit()
         db.refresh(analysis)
+
     except Exception:
         db.rollback()
         logger.exception("Could not verify analysis %s", analysis_id)
+
         raise HTTPException(
             status_code=500,
             detail="Could not save analysis verification.",
         ) from None
 
-    return get_analysis(analysis_id=analysis_id, db=db)
+    return build_analysis_response(analysis)
 
 
-
+# --------------------------------------------------
+# EDIT A DETECTION
+# --------------------------------------------------
 
 @router.patch(
     "/analyses/{analysis_id}/detections/{detection_id}",
@@ -455,13 +497,15 @@ def edit_detection(
             detail="Detection not found for this analysis.",
         )
 
-    detection.class_name = updates.class_name.strip()
-    if not detection.class_name:
+    class_name = updates.class_name.strip()
+
+    if not class_name:
         raise HTTPException(
             status_code=422,
             detail="Detection class name cannot be empty.",
         )
 
+    detection.class_name = class_name
     detection.confidence = updates.confidence
     detection.x = updates.x
     detection.y = updates.y
@@ -471,13 +515,16 @@ def edit_detection(
     try:
         db.commit()
         db.refresh(detection)
+
     except Exception:
         db.rollback()
+
         logger.exception(
             "Could not update detection %s in analysis %s",
             detection_id,
             analysis_id,
         )
+
         raise HTTPException(
             status_code=500,
             detail="Could not save detection changes.",

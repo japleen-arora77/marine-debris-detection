@@ -1,4 +1,4 @@
-
+import PollutionMapSection from "../components/map/PollutionMapSection";
 import { useEffect, useState } from "react";
 import {
   Waves,
@@ -691,46 +691,9 @@ export default function AnalyzeSection({
             </strong>
           </div>
         </section>
-
-        <section className="details-card">
-          <div className="block-heading">
-            <div className="block-heading-icon">
-              <MapPin size={20} />
-            </div>
-
-            <div>
-              <h3>Observation Location</h3>
-              <p>Map preview for a known observation site.</p>
-            </div>
-          </div>
-
-          <div className="map-placeholder">
-            <MapPin size={32} />
-            <strong>
-              {currentAnalysis?.latitude != null &&
-              currentAnalysis?.longitude != null
-                ? `${currentAnalysis.latitude}, ${currentAnalysis.longitude}`
-                : "No coordinates available"}
-            </strong>
-            <p>
-              {currentAnalysis?.latitude != null &&
-              currentAnalysis?.longitude != null
-                ? "Coordinates saved with this observation."
-                : "A map marker will appear after valid observation coordinates are supplied."}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            className="map-link-button"
-            disabled
-            title="Available after map integration"
-          >
-            <MapPin size={17} />
-            View on Pollution Map
-            <ExternalLink size={15} />
-          </button>
-        </section>
+      
+      <PollutionMapSection observations={[]} />
+     
       </div>
 
       {/* Footer */}
