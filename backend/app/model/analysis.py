@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from sqlalchemy import DateTime, Float, Integer, String
 from app.database import Base
 
 
@@ -20,6 +20,10 @@ class Analysis(Base):
 
     image_height: Mapped[int] = mapped_column(Integer, nullable=False)
 
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True,)
+
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

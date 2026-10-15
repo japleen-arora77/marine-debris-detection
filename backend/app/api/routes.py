@@ -2,7 +2,14 @@
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+) 
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -39,8 +46,28 @@ async def upload_image(file: UploadFile = File(...)):
 @router.post("/analyze", response_model=AnalysisResponse)
 async def analyze_image(
     file: UploadFile = File(...),
+    latitude: float | None = Form(default=None),
+    longitude: float | None = Form(default=None),
     db: Session = Depends(get_db),
 ):
+    if (latitude is None) != (longitude is None):
+            raise HTTPException(
+            status_code=422,
+            detail="Provide both latitude and longitude, or neither.",
+            )
+
+    if latitude is not None and not -90 <= latitude <= 90:
+            raise HTTPException(
+            status_code=422,
+            detail="Latitude must be between -90 and 90.",
+            )
+
+    if longitude is not None and not -180 <= longitude <= 180:
+            raise HTTPException(
+            status_code=422,
+            detail="Longitude must be between -180 and 180.",
+            )
+
     saved_path = None
 
     try:
@@ -66,7 +93,10 @@ async def analyze_image(
             model_id=ai_result["model_id"],
             image_width=int(image_width),
             image_height=int(image_height),
+            latitude=latitude,
+            longitude=longitude,
         )
+        
 
         # 4. Attach all validated detections to the analysis.
         for prediction in ai_result["predictions"]:
@@ -92,6 +122,8 @@ async def analyze_image(
             model_id=analysis.model_id,
             image_width=analysis.image_width,
             image_height=analysis.image_height,
+            latitude=analysis.latitude,
+            longitude=analysis.longitude,
             created_at=analysis.created_at,
             prediction_count=len(analysis.detections),
             detections=[
@@ -158,6 +190,8 @@ def list_analyses(
             model_id=analysis.model_id,
             image_width=analysis.image_width,
             image_height=analysis.image_height,
+            latitude=analysis.latitude,
+            longitude=analysis.longitude,
             created_at=analysis.created_at,
             prediction_count=len(analysis.detections),
             detections=[
@@ -202,6 +236,8 @@ def get_analysis(
         model_id=analysis.model_id,
         image_width=analysis.image_width,
         image_height=analysis.image_height,
+        latitude=analysis.latitude,
+        longitude=analysis.longitude,
         created_at=analysis.created_at,
         prediction_count=len(analysis.detections),
         detections=[

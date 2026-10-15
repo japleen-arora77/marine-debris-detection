@@ -22,6 +22,8 @@ class AnalysisResponse(BaseModel):
     model_id: str
     image_width: int
     image_height: int
+    latitude: float | None = None
+    longitude: float | None = None
     created_at: datetime
     prediction_count: int
     detections: list[DetectionResponse]

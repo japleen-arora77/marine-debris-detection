@@ -1,4 +1,4 @@
-
+import { analyzeImage } from "../services/api";
 import { useState } from "react";
 import {
   MapContainer,
@@ -54,6 +54,7 @@ export default function UploadPage() {
   const [searchError, setSearchError] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [pageError, setPageError] = useState("");
+  const [analysisResult, setAnalysisResult] = useState(null);
 
   function handleFileChange(event) {
     const selectedFile = event.target.files?.[0];
@@ -182,35 +183,38 @@ export default function UploadPage() {
     }
   }
 
-  async function handleAnalyze() {
-    if (!file) {
-      setPageError("Please upload an image before continuing.");
-      return;
-    }
-
-    if (!selectedLocation) {
-      setPageError("Search for a place or select a point on the map.");
-      return;
-    }
-
-    setPageError("");
-    setAnalyzing(true);
-
-    // Frontend milestone: no AI request is made yet.
-    // This object is ready to connect to the backend in a later step.
-    const scanSubmission = {
-      image: file,
-      location: selectedLocation,
-      submittedAt: new Date().toISOString(),
-    };
-
-    console.log("Aqua Scan submission prepared:", scanSubmission);
-
-    setAnalyzing(false);
-    setPageError(
-      "Image and location are ready. AI analysis will be connected when we integrate the backend."
-    );
+  
+async function handleAnalyze() {
+  if (!file) {
+    setPageError("Please upload an image before continuing.");
+    return;
   }
+
+  if (!selectedLocation) {
+    setPageError("Search for a place or select a point on the map.");
+    return;
+  }
+
+  setPageError("");
+  setAnalysisResult(null);
+  setAnalyzing(true);
+
+  try {
+    const result = await analyzeImage(file, selectedLocation);
+
+    setAnalysisResult(result);
+    setPageError("Image analysis completed successfully.");
+    console.log("Aqua Scan analysis result:", result);
+  } catch (error) {
+    console.error("Aqua Scan analysis failed:", error);
+    setPageError(
+      error.message || "Analysis failed. Please try again."
+    );
+  } finally {
+    setAnalyzing(false);
+  }
+}
+
 
   return (
     <main className="upload-page">
@@ -424,6 +428,31 @@ export default function UploadPage() {
               "Analyze Image"
             )}
           </button>
+          
+{analysisResult && (
+  <div className="upload-feedback" role="status">
+    <strong>Analysis complete</strong>
+    <p>Analysis ID: {analysisResult.id}</p>
+    <p>Detected objects: {analysisResult.prediction_count}</p>
+    <p>
+      Location: {analysisResult.latitude}, {analysisResult.longitude}
+    </p>
+
+    {analysisResult.detections?.length > 0 ? (
+      <ul>
+        {analysisResult.detections.map((detection) => (
+          <li key={detection.id}>
+            {detection.class_name} —{" "}
+            {(detection.confidence * 100).toFixed(1)}% confidence
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p>No objects were detected in this image.</p>
+    )}
+  </div>
+)}
+
         </div>
       </section>
     </main>
