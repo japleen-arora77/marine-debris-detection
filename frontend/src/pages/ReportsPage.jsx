@@ -63,7 +63,7 @@ export default function ReportsPage() {
 
         <div className="reports-brand">
           <span className="reports-brand-icon"><FileText size={19} /></span>
-          <span>Aqua Scan</span>
+          <span>AquaScan</span>
           <span className="reports-brand-divider">/</span>
           <span className="reports-brand-current">Reports</span>
         </div>
@@ -190,7 +190,7 @@ export default function ReportsPage() {
       </section>
 
       <footer className="reports-footer">
-        <span>Aqua Scan · Marine Debris Detection</span>
+        <span>AquaScan · Marine Debris Detection System</span>
         <span>Data from saved observations</span>
       </footer>
     </main>

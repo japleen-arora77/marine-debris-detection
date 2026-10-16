@@ -148,7 +148,7 @@ export default function IndividualReportPage() {
 
           <div className="ir-heading-copy">
             <span className="ir-eyebrow">
-              AQUA SCAN · OBSERVATION REPORT
+              AquaScan · OBSERVATION REPORT
             </span>
             <h1>{observation.location}</h1>
             <p>
@@ -411,7 +411,7 @@ export default function IndividualReportPage() {
           <div>
             <Waves size={20} />
             <span>
-              <strong>Aqua Scan</strong>
+              <strong>AquaScan</strong>
               <small>
                 AI-assisted marine debris monitoring prototype
               </small>

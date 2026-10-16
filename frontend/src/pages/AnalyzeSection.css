@@ -667,3 +667,311 @@
     width: 100%;
   }
 }
+
+
+
+/* =========================================
+   DETECTED OBJECTS — CARD & ACTION STYLING
+   Visual-only improvements; no logic changes
+   ========================================= */
+
+   .detected-heading {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  
+  .detected-heading > div:nth-child(2) {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .detected-heading .count-pill {
+    flex-shrink: 0;
+    padding: 9px 15px;
+    font-size: 12px;
+    font-weight: 700;
+    background: #F3F9FC;
+    border: 1px solid #D7E6EF;
+    border-radius: 999px;
+  }
+  
+  /* Detection list */
+  .detections-list {
+    display: grid;
+    gap: 14px;
+  }
+  
+  .detection-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    min-width: 0;
+    padding: 22px 24px;
+    background: linear-gradient(135deg, #FFFFFF 0%, #F7FBFD 100%);
+    border: 1px solid #DCE8EF;
+    border-radius: 16px;
+    box-shadow: 0 3px 12px rgba(11, 37, 69, 0.035);
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
+  }
+  
+  .detection-item:hover {
+    border-color: #B7D7E5;
+    box-shadow: 0 7px 20px rgba(11, 37, 69, 0.07);
+  }
+  
+  .detection-item > div:first-child:not(.detection-edit-form) {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .detection-item > div:first-child > strong {
+    display: block;
+    margin-bottom: 7px;
+    color: #0B2545;
+    font-size: 17px;
+    font-weight: 750;
+    line-height: 1.4;
+    text-transform: capitalize;
+    overflow-wrap: anywhere;
+  }
+  
+  .detection-item > div:first-child > p {
+    margin: 0 0 13px;
+    color: #52677D;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  
+  /* AI / verified status pill */
+  .detection-item .count-pill {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 7px 12px;
+    color: #176B87;
+    background: #EAF6FB;
+    border: 1px solid #D1EAF3;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  
+  /* Buttons inside the detected object section only */
+  .detection-item > button,
+  .detection-edit-actions button,
+  .verification-actions > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    min-height: 44px;
+    padding: 11px 18px;
+    color: #FFFFFF;
+    background: #176B87;
+    border: 1px solid #176B87;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.4;
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
+  }
+  
+  .detection-item > button:hover,
+  .detection-edit-actions button:hover,
+  .verification-actions > button:hover:not(:disabled) {
+    background: #10566E;
+    border-color: #10566E;
+    box-shadow: 0 4px 12px rgba(23, 107, 135, 0.18);
+    transform: translateY(-1px);
+  }
+  
+  .detection-item button:focus-visible,
+  .verification-actions > button:focus-visible {
+    outline: 3px solid #9AD9EB;
+    outline-offset: 3px;
+  }
+  
+  .detection-item button:disabled,
+  .verification-actions > button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+  
+  /* Edit form */
+  .detection-edit-form {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 17px;
+  }
+  
+  .detection-edit-form label {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+    color: #334B61;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  
+  .detection-edit-form input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: 43px;
+    padding: 10px 12px;
+    color: #0B2545;
+    background: #FFFFFF;
+    border: 1px solid #D5E1E9;
+    border-radius: 9px;
+    font-family: inherit;
+    font-size: 14px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .detection-edit-form input:focus {
+    border-color: #176B87;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(23, 107, 135, 0.12);
+  }
+  
+  .detection-edit-actions {
+    display: flex;
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  
+  .detection-edit-actions button:last-child {
+    color: #334B61;
+    background: #FFFFFF;
+    border-color: #D5E1E9;
+  }
+  
+  .detection-edit-actions button:last-child:hover {
+    background: #F0F5F8;
+    border-color: #B9CAD6;
+    box-shadow: none;
+  }
+  
+  /* Feedback messages */
+  .verification-error,
+  .verification-success {
+    margin: 0 0 16px;
+    padding: 13px 16px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  
+  .verification-error {
+    color: #A52626;
+    background: #FFF0F0;
+    border-color: #F3CECE;
+  }
+  
+  .verification-success {
+    color: #176548;
+    background: #EAF8F0;
+    border-color: #C9EBD8;
+  }
+  
+  /* Human verification panel */
+  .verification-actions {
+    padding: 24px;
+    background: linear-gradient(135deg, #FFFFFF 0%, #F5FAFC 100%);
+    border: 1px solid #DCE8EF;
+    border-radius: 16px;
+  }
+  
+  .verification-actions .block-heading {
+    margin-bottom: 20px;
+  }
+  
+  .verification-actions > button {
+    min-height: 46px;
+    padding: 12px 20px;
+    background: #0B6B58;
+    border-color: #0B6B58;
+  }
+  
+  .verification-actions > button:hover:not(:disabled) {
+    background: #085543;
+    border-color: #085543;
+    box-shadow: 0 4px 12px rgba(11, 107, 88, 0.2);
+  }
+  
+  .verification-actions > p {
+    margin: 15px 0 0;
+    color: #52677D;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  
+  /* Responsive layout */
+  @media (max-width: 650px) {
+    .detected-heading {
+      align-items: flex-start;
+      gap: 11px;
+    }
+  
+    .detected-heading > div:nth-child(2) {
+      flex-basis: calc(100% - 55px);
+    }
+  
+    .detected-heading > .count-pill {
+      margin-left: 51px;
+    }
+  
+    .detection-item {
+      align-items: stretch;
+      flex-direction: column;
+      gap: 18px;
+      padding: 18px;
+    }
+  
+    .detection-item > button {
+      width: 100%;
+    }
+  
+    .detection-edit-form {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 14px;
+    }
+  
+    .detection-edit-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+    }
+  
+    .detection-edit-actions button {
+      width: 100%;
+    }
+  
+    .verification-actions {
+      padding: 18px;
+    }
+  
+    .verification-actions > button {
+      width: 100%;
+    }
+  }
+  

@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Images"])
 
 UPLOAD_DIR = Path("uploads")
+#temp chk
+print("UPLOAD_DIR resolves to:", UPLOAD_DIR.resolve())
 
 
 def build_analysis_response(analysis: Analysis) -> AnalysisResponse:
@@ -311,13 +313,20 @@ def get_original_image(
     analysis_id: int,
     db: Session = Depends(get_db),
 ):
+    
     """Return the original image associated with an analysis."""
 
+    print("========== ORIGINAL IMAGE ENDPOINT HIT ==========")
+    print("Analysis ID received:", analysis_id, flush=True)
     analysis = (
         db.query(Analysis)
         .filter(Analysis.id == analysis_id)
         .first()
     )
+
+    print("Requested analysis ID:", analysis_id)
+    print("Database filename:", analysis.filename if analysis else None)
+    print("Resolved image path:", (UPLOAD_DIR / analysis.filename).resolve() if analysis else None)
 
     if analysis is None:
         raise HTTPException(

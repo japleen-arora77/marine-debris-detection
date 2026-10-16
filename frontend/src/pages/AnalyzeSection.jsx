@@ -1,7 +1,7 @@
 import PollutionMapSection from "../components/map/PollutionMapSection";
 import { useEffect, useState } from "react";
 import {
-  Waves,
+  Waves, 
   ScanSearch,
   MapPin,
   CalendarDays,
@@ -179,7 +179,10 @@ export default function AnalyzeSection({
   }
 
   return (
-    <section className="analyze-section" id="analyze-section">
+    <section
+    className="analyze-section"
+    id="observation-summary"
+  >
       {/* Page Heading */}
       <header className="observation-heading">
         <div className="observation-title-group">
@@ -189,7 +192,7 @@ export default function AnalyzeSection({
 
           <div>
             <div className="observation-breadcrumb">
-              Aqua Scan <span>/</span> Detection{" "}
+              AquaScan <span>/</span> Detection{" "}
               <span>/</span> Observation Summary
             </div>
 
@@ -698,7 +701,7 @@ export default function AnalyzeSection({
 
       {/* Footer */}
       <footer className="analysis-footer">
-        Aqua Scan · Environmental monitoring prototype ·
+        AquaScan · Environmental monitoring prototype ·
         Inspection priority is not a scientific pollution measurement.
       </footer>
     </section>

@@ -1,3 +1,4 @@
+
 import { analyzeImage } from "../services/api";
 import { useState } from "react";
 import {
@@ -54,7 +55,6 @@ export default function UploadPage({ onAnalysisComplete }) {
   const [searchError, setSearchError] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [pageError, setPageError] = useState("");
-  const [analysisResult, setAnalysisResult] = useState(null);
 
   function handleFileChange(event) {
     const selectedFile = event.target.files?.[0];
@@ -62,7 +62,11 @@ export default function UploadPage({ onAnalysisComplete }) {
 
     setPageError("");
 
-    if (!["image/jpeg", "image/png", "image/webp"].includes(selectedFile.type)) {
+    if (
+      !["image/jpeg", "image/png", "image/webp"].includes(
+        selectedFile.type
+      )
+    ) {
       setPageError("Please select a JPG, PNG, or WEBP image.");
       return;
     }
@@ -80,6 +84,7 @@ export default function UploadPage({ onAnalysisComplete }) {
 
   function clearImage() {
     if (preview) URL.revokeObjectURL(preview);
+
     setFile(null);
     setPreview("");
   }
@@ -88,6 +93,7 @@ export default function UploadPage({ onAnalysisComplete }) {
     event.preventDefault();
 
     const query = locationQuery.trim();
+
     if (!query) {
       setSearchError("Enter a beach, coastal area, or place name.");
       return;
@@ -108,13 +114,17 @@ export default function UploadPage({ onAnalysisComplete }) {
         `https://nominatim.openstreetmap.org/search?${params.toString()}`
       );
 
-      if (!response.ok) throw new Error("Location search is unavailable.");
+      if (!response.ok) {
+        throw new Error("Location search is unavailable.");
+      }
 
       const results = await response.json();
       setSearchResults(results);
 
       if (results.length === 0) {
-        setSearchError("No matching places found. Try a more specific name.");
+        setSearchError(
+          "No matching places found. Try a more specific name."
+        );
       }
     } catch {
       setSearchError(
@@ -145,8 +155,6 @@ export default function UploadPage({ onAnalysisComplete }) {
     setSearchResults([]);
     setSearchError("");
 
-    // Coordinates are real; the place name is only set after
-    // a successful reverse-geocoding response.
     setSelectedLocation({
       name: "",
       latitude: position[0],
@@ -164,7 +172,9 @@ export default function UploadPage({ onAnalysisComplete }) {
         `https://nominatim.openstreetmap.org/reverse?${params.toString()}`
       );
 
-      if (!response.ok) throw new Error("Reverse geocoding failed");
+      if (!response.ok) {
+        throw new Error("Reverse geocoding failed");
+      }
 
       const result = await response.json();
       const name = result.display_name || "";
@@ -183,39 +193,42 @@ export default function UploadPage({ onAnalysisComplete }) {
     }
   }
 
-  
-async function handleAnalyze() {
-  if (!file) {
-    setPageError("Please upload an image before continuing.");
-    return;
+  async function handleAnalyze() {
+    if (!file) {
+      setPageError("Please upload an image before continuing.");
+      return;
+    }
+
+    if (!selectedLocation) {
+      setPageError("Search for a place or select a point on the map.");
+      return;
+    }
+
+    setPageError("");
+    setAnalyzing(true);
+
+    try {
+      // Existing backend analysis call.
+      const result = await analyzeImage(file, selectedLocation);
+
+      // Keep passing the result to App.jsx and AnalyzeSection.
+      onAnalysisComplete?.(result, preview);
+
+      // Scroll to Observation Summary after successful analysis.
+      document.getElementById("observation-summary")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    } catch (error) {
+      console.error("Aqua Scan analysis failed:", error);
+
+      setPageError(
+        error.message || "Analysis failed. Please try again."
+      );
+    } finally {
+      setAnalyzing(false);
+    }
   }
-
-  if (!selectedLocation) {
-    setPageError("Search for a place or select a point on the map.");
-    return;
-  }
-
-  setPageError("");
-  setAnalysisResult(null);
-  setAnalyzing(true);
-
-  try {
-    const result = await analyzeImage(file, selectedLocation);
-    onAnalysisComplete?.(result, preview);
-
-    setAnalysisResult(result);
-    setPageError("Image analysis completed successfully.");
-    console.log("Aqua Scan analysis result:", result);
-  } catch (error) {
-    console.error("Aqua Scan analysis failed:", error);
-    setPageError(
-      error.message || "Analysis failed. Please try again."
-    );
-  } finally {
-    setAnalyzing(false);
-  }
-}
-
 
   return (
     <main className="upload-page">
@@ -224,10 +237,10 @@ async function handleAnalyze() {
           <span className="brand-mark">
             <Waves size={22} />
           </span>
-          <span>Marine Debris Detection</span>
+          <span>AquaScan - Marine Debris Detection System</span>
         </div>
 
-        <div className="upload-steps" aria-label="Analysis progress">
+        {/* <div className="upload-steps" aria-label="Analysis progress">
           <div className="step-item active">
             <span className="step-number">1</span>
             <span>Upload</span>
@@ -242,7 +255,7 @@ async function handleAnalyze() {
             <span className="step-number">3</span>
             <span>Report</span>
           </div>
-        </div>
+        </div> */}
       </header>
 
       <section className="upload-workspace">
@@ -253,7 +266,10 @@ async function handleAnalyze() {
             </span>
             <div>
               <h1>Upload Image</h1>
-              <p>Upload a clear image of a beach or coastal area for AI analysis.</p>
+              <p>
+                Upload a clear image of a beach or coastal area for AI
+                analysis.
+              </p>
             </div>
           </div>
 
@@ -266,16 +282,20 @@ async function handleAnalyze() {
                   className="image-preview"
                 />
                 <span className="preview-name">{file?.name}</span>
-                <span className="preview-hint">Click to replace image</span>
+                <span className="preview-hint">
+                  Click to replace image
+                </span>
               </>
             ) : (
               <>
                 <Upload size={34} strokeWidth={1.5} />
-                <strong>Drag & drop your image</strong>
+                <strong>Drag &amp; drop your image</strong>
                 <span>
                   or <span className="browse-text">browse files</span>
                 </span>
-                <small>JPG, PNG, WEBP <span>·</span> Max 10 MB</small>
+                <small>
+                  JPG, PNG, WEBP <span>·</span> Max 10 MB
+                </small>
               </>
             )}
 
@@ -299,7 +319,9 @@ async function handleAnalyze() {
 
           <div className="upload-tip">
             <CheckCircle2 size={16} />
-            <span>For best results, use a clear, well-lit coastal image.</span>
+            <span>
+              For best results, use a clear, well-lit coastal image.
+            </span>
           </div>
         </div>
 
@@ -322,6 +344,7 @@ async function handleAnalyze() {
               placeholder="Search beach or coastal area"
               aria-label="Search for a location"
             />
+
             {locationQuery && (
               <button
                 type="button"
@@ -336,6 +359,7 @@ async function handleAnalyze() {
                 <X size={17} />
               </button>
             )}
+
             <button
               type="submit"
               className="search-submit"
@@ -366,11 +390,15 @@ async function handleAnalyze() {
             </div>
           )}
 
-          {searchError && <p className="location-message">{searchError}</p>}
+          {searchError && (
+            <p className="location-message">{searchError}</p>
+          )}
 
           <div className="map-label-row">
             <span>Map preview</span>
-            <span><Navigation size={13} /> Click map to select</span>
+            <span>
+              <Navigation size={13} /> Click map to select
+            </span>
           </div>
 
           <div className="location-map">
@@ -390,15 +418,18 @@ async function handleAnalyze() {
             </MapContainer>
           </div>
 
-          <div className={`selected-location ${selectedLocation ? "selected" : ""}`}>
+          <div
+            className={`selected-location ${
+              selectedLocation ? "selected" : ""
+            }`}
+          >
             <MapPin size={19} />
             <div>
               <strong>
-                {selectedLocation?.name || (
-                  selectedLocation
+                {selectedLocation?.name ||
+                  (selectedLocation
                     ? "Selected map coordinates"
-                    : "No location selected"
-                )}
+                    : "No location selected")}
               </strong>
               <span>
                 {selectedLocation
@@ -411,7 +442,9 @@ async function handleAnalyze() {
 
         <div className="upload-footer">
           {pageError && (
-            <p className="upload-feedback" role="status">{pageError}</p>
+            <p className="upload-feedback" role="status">
+              {pageError}
+            </p>
           )}
 
           <button
@@ -429,31 +462,6 @@ async function handleAnalyze() {
               "Analyze Image"
             )}
           </button>
-          
-{analysisResult && (
-  <div className="upload-feedback" role="status">
-    <strong>Analysis complete</strong>
-    <p>Analysis ID: {analysisResult.id}</p>
-    <p>Detected objects: {analysisResult.prediction_count}</p>
-    <p>
-      Location: {analysisResult.latitude}, {analysisResult.longitude}
-    </p>
-
-    {analysisResult.detections?.length > 0 ? (
-      <ul>
-        {analysisResult.detections.map((detection) => (
-          <li key={detection.id}>
-            {detection.class_name} —{" "}
-            {(detection.confidence * 100).toFixed(1)}% confidence
-          </li>
-        ))}
-      </ul>
-    ) : (
-      <p>No objects were detected in this image.</p>
-    )}
-  </div>
-)}
-
         </div>
       </section>
     </main>

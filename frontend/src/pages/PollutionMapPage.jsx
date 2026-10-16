@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getOriginalImageUrl } from "../services/api";
 import {
   MapContainer,
   TileLayer,
@@ -229,8 +230,8 @@ const debrisCounts = locatedObservations.map(
   const debrisCount = selectedDetections.length;
 
   const originalImageUrl = selectedObservation
-    ? `${API_BASE_URL}/api/analyses/${selectedObservation.id}/image`
-    : "";
+  ? getOriginalImageUrl(selectedObservation.id)
+  : "";
 
   return (
     <main className="pollution-page">
