@@ -1,5 +1,5 @@
 
-# Marine Debris Detection
+# AquaScan - qMarine Debris Detection
 
 ### AI-Driven Marine Debris Detection and Mapping System for Ocean Conservation
 
@@ -82,15 +82,15 @@ Planned Technology: Chart.js for data visualization.
 
 When the backend is running, its interactive API documentation is generally available at `/docs`.
 
-## Current Development Status
+## Development Status
 
 - React frontend setup completed.
 - Image upload and observation-summary interface implemented.
 - Location search and map selection available in the upload interface.
-- Complete AI detection workflow requires verification.
-- Interactive observation mapping is pending.
-- Backend-saved human verification is pending.
-- PDF export are pending.
+- Complete AI detection workflow.
+- Human verification implemented.
+- Interactive pollution map completed.
+- PDF export for summary and individuals sites are completed.
 
 ## Limitations
 
@@ -105,10 +105,9 @@ This project is a prototype and does not provide scientific measurements of ocea
 
 - Complete and test the AI detection workflow.
 - Develop interactive observation mapping.
-- Add charts and downloadable reports.
+- Add charts in reports.
 - Improve observation verification and data visualization.
-- Enhance usability and overall system reliability.
+- Enhance usability and UX.
 
-All new features should be tested before being marked as complete.
 
 Developed by Team Runtime Rebels for BuildFest 2.0.
