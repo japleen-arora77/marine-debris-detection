@@ -63,3 +63,55 @@ export async function updateDetection(analysisId, detectionId, updates) {
 
   return data;
 }
+
+// Fetch all analysis records, including records beyond the first page.
+export async function getAllAnalyses() {
+  const items = [];
+  const limit = 100;
+  let offset = 0;
+  let total = Infinity;
+
+  while (offset < total) {
+    const response = await fetch(
+      `${API_BASE_URL}/api/analyses?limit=${limit}&offset=${offset}`
+    );
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.detail || "Could not load analysis history.");
+    }
+
+    const page = data.items || [];
+    items.push(...page);
+    total = Number(data.total) || 0;
+
+    if (page.length === 0) break;
+    offset += page.length;
+  }
+
+  return items;
+}
+
+// Fetch the complete details of one analysis.
+export async function getAnalysis(analysisId) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/analyses/${analysisId}`
+  );
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.detail || "Could not load this observation.");
+  }
+  return data;
+}
+
+// Image URLs for saved observations.
+
+export function getOriginalImageUrl(analysisId) {
+  return `${API_BASE_URL}/api/analyses/${analysisId}/image`;
+}
+
+
+export function getAnnotatedImageUrl(analysisId) {
+  return `${API_BASE_URL}/api/analyses/${analysisId}/annotated-image`;
+}
