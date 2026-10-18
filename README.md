@@ -1,5 +1,5 @@
 
-# AquaScan - qMarine Debris Detection
+# AquaScan - Marine Debris Detection
 
 ### AI-Driven Marine Debris Detection and Mapping System for Ocean Conservation
 
